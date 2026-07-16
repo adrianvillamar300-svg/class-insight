@@ -1,0 +1,5 @@
+Profesor: Buenos días chicos de la ESPOL, hoy iniciaremos con la unidad 3 de la materia. 
+Antes de empezar con la clase de redes, les recuerdo que la próxima semana, exactamente el martes 14, 
+tendremos la lección número uno de este parcial, entra todo lo visto hasta hoy. 
+Y vayan preparándose porque el examen del primer parcial está agendado para finales de mes, el viernes 31.
+Por favor repasen el concepto de direccionamiento IP que explicamos en el minuto 10.
