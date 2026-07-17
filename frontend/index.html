@@ -882,6 +882,71 @@
     .btn-copy svg, .btn-download svg { width: 13px; height: 13px; }
     .btn-copy:hover, .btn-download:hover { color: var(--cyan); border-color: var(--border-hi); background: var(--cyan-glow); transform: translateY(-1px); }
 
+    /* PDF button — primary, clearly visible */
+    .btn-pdf {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      font-size: 0.82rem;
+      font-weight: 600;
+      color: #fff;
+      background: linear-gradient(135deg, #2b6cb0, #2c5282);
+      border: 1px solid rgba(99,179,237,0.35);
+      border-radius: 8px;
+      padding: 8px 16px;
+      cursor: pointer;
+      transition: all var(--transition);
+      box-shadow: 0 3px 18px rgba(43,108,176,0.35);
+      overflow: hidden;
+    }
+
+    .btn-pdf svg { width: 14px; height: 14px; }
+
+    .btn-pdf:hover:not(:disabled) {
+      background: linear-gradient(135deg, #3182ce, #2b6cb0);
+      box-shadow: 0 4px 24px rgba(99,179,237,0.5);
+      transform: translateY(-1px);
+    }
+
+    .btn-pdf:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
+
+    .pdf-progress {
+      display: none;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 24px 0;
+      background: var(--glass);
+      border: 1px solid var(--border);
+      border-top: none;
+    }
+
+    .pdf-progress.show { display: flex; }
+
+    .pdf-progress-track {
+      flex: 1;
+      height: 5px;
+      border-radius: 99px;
+      background: var(--glass-hi);
+      border: 1px solid var(--border);
+      overflow: hidden;
+    }
+
+    .pdf-progress-fill {
+      height: 100%;
+      width: 0%;
+      background: linear-gradient(90deg, #2b6cb0, #63b3ed);
+      border-radius: 99px;
+      transition: width 0.25s ease;
+      box-shadow: 0 0 8px var(--cyan-glow);
+    }
+
+    .pdf-progress-label {
+      font-size: 0.72rem;
+      color: var(--muted);
+      white-space: nowrap;
+      font-variant-numeric: tabular-nums;
+    }
+
     .results-body {
       background: var(--glass);
       border: 1px solid var(--border);
@@ -1330,7 +1395,18 @@
             </svg>
             Descargar
           </button>
+          <button class="btn-pdf" id="btn-pdf" onclick="generatePDF()">
+            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l4.414 4.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+            </svg>
+            📄 Descargar PDF
+          </button>
         </div>
+      </div>
+      <div class="pdf-progress" id="pdfProgress">
+        <span class="pdf-progress-label" id="pdfProgressLabel">Preparando PDF...</span>
+        <div class="pdf-progress-track"><div class="pdf-progress-fill" id="pdfProgressFill"></div></div>
+        <span class="pdf-progress-label" id="pdfProgressPct">0%</span>
       </div>
       <div class="results-body">
         <div id="result-content"></div>
@@ -1343,6 +1419,8 @@
     ClassInsight &copy; 2026 &middot; Construido con <span>Amazon Bedrock</span> &amp; FastAPI
   </footer>
 
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
   <script>
     let currentTab = 'audio';
     let selectedFiles = { audio: null, video: null };
@@ -1602,6 +1680,16 @@
         stopTicker();
         stopTimer();
         document.getElementById('processing').classList.remove('show');
+
+        window.lastResultMd = result;
+        window.lastAnalysisMeta = {
+          fileName: currentTab === 'youtube'
+            ? (document.getElementById('yt-url').value.trim() || 'Video de YouTube')
+            : ((selectedFiles[currentTab] && selectedFiles[currentTab].name) || 'Archivo sin nombre'),
+          fileType: currentTab === 'audio' ? 'Audio' : (currentTab === 'video' ? 'Video' : 'YouTube'),
+          analyzedAt: new Date()
+        };
+
         await renderResult(result);
         toast('Resultado listo', 'success');
       } catch (err) {
@@ -1804,6 +1892,333 @@
       a.remove();
       URL.revokeObjectURL(url);
       toast('Descarga iniciada', 'success');
+    }
+
+    /* =========================================================
+       PDF GENERATION — professional report layout
+    ========================================================= */
+    function pad2(n) { return String(n).padStart(2, '0'); }
+
+    function pdfFileName(date) {
+      const d = date || new Date();
+      return `Analisis_Clase_${d.getFullYear()}-${pad2(d.getMonth()+1)}-${pad2(d.getDate())}_${pad2(d.getHours())}-${pad2(d.getMinutes())}.pdf`;
+    }
+
+    function parseMarkdownTableBlock(block) {
+      const lines = block.trim().split('\n').map(l => l.trim()).filter(Boolean);
+      if (lines.length < 2) return null;
+      if (!lines.every(l => l.includes('|'))) return null;
+      const isSep = /^\|?\s*:?-{2,}:?\s*(\|\s*:?-{2,}:?\s*)*\|?$/.test(lines[1]);
+      if (!isSep) return null;
+      const splitRow = l => l.replace(/^\|/, '').replace(/\|$/, '').split('|').map(c => c.trim());
+      return { header: splitRow(lines[0]), rows: lines.slice(2).map(splitRow) };
+    }
+
+    // Tokenize inline markdown (**bold**, *italic*) into word-level runs for manual layout
+    function tokenizeInline(text) {
+      const runs = [];
+      const re = /\*\*(.+?)\*\*|\*(.+?)\*|([^*]+)/g;
+      let m;
+      while ((m = re.exec(text)) !== null) {
+        if (m[1] !== undefined) runs.push({ text: m[1], bold: true, italic: false });
+        else if (m[2] !== undefined) runs.push({ text: m[2], bold: false, italic: true });
+        else if (m[3] !== undefined) runs.push({ text: m[3], bold: false, italic: false });
+      }
+      const words = [];
+      runs.forEach(run => {
+        run.text.split(/(\s+)/).filter(p => p.length).forEach(p => {
+          words.push({ text: p, bold: run.bold, italic: run.italic, isSpace: /^\s+$/.test(p) });
+        });
+      });
+      return words;
+    }
+
+    async function generatePDF() {
+      const md = window.lastResultMd;
+      if (!md) { toast('No hay resultado para exportar todavía', 'error'); return; }
+      if (!window.jspdf || !window.jspdf.jsPDF) { toast('El generador de PDF aún no cargó, intenta de nuevo en un segundo', 'error'); return; }
+
+      const btn = document.getElementById('btn-pdf');
+      const progress = document.getElementById('pdfProgress');
+      const fill = document.getElementById('pdfProgressFill');
+      const pct = document.getElementById('pdfProgressPct');
+      const label = document.getElementById('pdfProgressLabel');
+
+      btn.disabled = true;
+      progress.classList.add('show');
+      label.textContent = 'Preparando PDF...';
+      fill.style.width = '4%';
+      pct.textContent = '4%';
+
+      const setProgress = (p, msg) => {
+        fill.style.width = p + '%';
+        pct.textContent = Math.round(p) + '%';
+        if (msg) label.textContent = msg;
+      };
+      const sleep0 = () => new Promise(r => setTimeout(r, 0));
+
+      try {
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF({ unit: 'mm', format: 'a4' });
+        const pageWidth = doc.internal.pageSize.getWidth();
+        const pageHeight = doc.internal.pageSize.getHeight();
+        const marginLeft = 20, marginRight = 20, marginTop = 20, marginBottom = 22;
+        const contentWidth = pageWidth - marginLeft - marginRight;
+
+        const navy = [26, 32, 44];
+        const accent = [43, 108, 176];
+        const muted = [100, 116, 139];
+        const lightFill = [237, 242, 247];
+
+        let y = marginTop;
+
+        const ensureSpace = (needed) => {
+          if (y + needed > pageHeight - marginBottom) {
+            doc.addPage();
+            y = marginTop;
+          }
+        };
+
+        const meta = window.lastAnalysisMeta || {};
+        const now = new Date();
+        const dateStr = now.toLocaleString('es-ES', { day: '2-digit', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+
+        /* ---- Header / cover ---- */
+        doc.setFillColor(accent[0], accent[1], accent[2]);
+        doc.roundedRect(marginLeft, y, 10, 10, 2, 2, 'F');
+        doc.setTextColor(255, 255, 255);
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(9);
+        doc.text('CI', marginLeft + 5, y + 6.7, { align: 'center' });
+
+        doc.setTextColor(muted[0], muted[1], muted[2]);
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(10);
+        doc.text('ClassInsight', marginLeft + 14, y + 6.7);
+
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(9);
+        doc.text(dateStr, pageWidth - marginRight, y + 6.7, { align: 'right' });
+
+        y += 16;
+        doc.setTextColor(navy[0], navy[1], navy[2]);
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(19);
+        doc.text('Informe de Análisis de Clase', marginLeft, y);
+        y += 6;
+        doc.setDrawColor(accent[0], accent[1], accent[2]);
+        doc.setLineWidth(0.6);
+        doc.line(marginLeft, y, pageWidth - marginRight, y);
+        y += 10;
+
+        /* ---- Info box ---- */
+        const infoRows = [
+          ['Archivo analizado', meta.fileName || 'No disponible'],
+          ['Tipo de entrada', meta.fileType || 'No disponible'],
+          ['Fecha del análisis', (meta.analyzedAt || now).toLocaleString('es-ES')],
+          ['Motor de IA', 'Amazon Bedrock']
+        ];
+        const boxHeight = infoRows.length * 6.4 + 8;
+        ensureSpace(boxHeight + 4);
+        doc.setFillColor(lightFill[0], lightFill[1], lightFill[2]);
+        doc.roundedRect(marginLeft, y, contentWidth, boxHeight, 2, 2, 'F');
+        let iy = y + 8;
+        infoRows.forEach(([k, v]) => {
+          doc.setFont('helvetica', 'bold');
+          doc.setFontSize(9);
+          doc.setTextColor(navy[0], navy[1], navy[2]);
+          doc.text(k + ':', marginLeft + 6, iy);
+          doc.setFont('helvetica', 'normal');
+          doc.setTextColor(60, 72, 88);
+          doc.text(String(v), marginLeft + 52, iy);
+          iy += 6.4;
+        });
+        y += boxHeight + 12;
+
+        setProgress(12, 'Estructurando contenido...');
+        await sleep0();
+
+        /* ---- Body content ---- */
+        const blocks = splitBlocks(md);
+        const total = blocks.length || 1;
+
+        const drawWrappedRuns = (words, x, startY, maxW, opts) => {
+          const fontSize = opts.fontSize || 10;
+          const lineHeight = opts.lineHeight || 5.6;
+          const justify = opts.justify !== false;
+          doc.setFontSize(fontSize);
+
+          const setStyle = (bold, italic) => {
+            let style = 'normal';
+            if (bold && italic) style = 'bolditalic';
+            else if (bold) style = 'bold';
+            else if (italic) style = 'italic';
+            doc.setFont('helvetica', style);
+          };
+          setStyle(false, false);
+          const spaceWidth = doc.getTextWidth(' ');
+
+          const lines = [];
+          let currentLine = [];
+          let currentWidth = 0;
+          words.forEach(w => {
+            if (w.isSpace) {
+              if (currentLine.length === 0) return;
+              currentLine.push({ space: true });
+              currentWidth += spaceWidth;
+              return;
+            }
+            setStyle(w.bold, w.italic);
+            const wWidth = doc.getTextWidth(w.text);
+            if (currentWidth + wWidth > maxW && currentLine.length > 0) {
+              while (currentLine.length && currentLine[currentLine.length - 1].space) currentLine.pop();
+              lines.push(currentLine);
+              currentLine = [];
+              currentWidth = 0;
+            }
+            currentLine.push({ text: w.text, bold: w.bold, italic: w.italic, width: wWidth });
+            currentWidth += wWidth;
+          });
+          if (currentLine.length) {
+            while (currentLine.length && currentLine[currentLine.length - 1].space) currentLine.pop();
+            lines.push(currentLine);
+          }
+
+          let cy = y;
+          lines.forEach((line, idx) => {
+            ensureSpace(lineHeight);
+            cy = y;
+            const isLast = idx === lines.length - 1;
+            const tokens = line.filter(t => !t.space);
+            const totalW = tokens.reduce((s, t) => s + t.width, 0);
+            const gaps = tokens.length - 1;
+            let gap = spaceWidth;
+            if (!isLast && gaps > 0 && justify) {
+              gap = (maxW - totalW) / gaps;
+            }
+            let cx = x;
+            tokens.forEach((t, i) => {
+              setStyle(t.bold, t.italic);
+              doc.text(t.text, cx, cy);
+              cx += t.width + (i < tokens.length - 1 ? gap : 0);
+            });
+            y = cy + lineHeight;
+          });
+          setStyle(false, false);
+          return y;
+        };
+
+        for (let i = 0; i < blocks.length; i++) {
+          const block = blocks[i];
+          const trimmed = block.trim();
+
+          const table = parseMarkdownTableBlock(trimmed);
+          if (table) {
+            ensureSpace(18);
+            doc.autoTable({
+              startY: y,
+              head: [table.header],
+              body: table.rows,
+              margin: { left: marginLeft, right: marginRight },
+              styles: { font: 'helvetica', fontSize: 9, cellPadding: 3.2, textColor: [40, 48, 60], lineColor: [225, 230, 238], lineWidth: 0.2 },
+              headStyles: { fillColor: accent, textColor: 255, fontStyle: 'bold' },
+              alternateRowStyles: { fillColor: [246, 248, 251] },
+              theme: 'grid'
+            });
+            y = doc.lastAutoTable.finalY + 8;
+          } else if (/^###\s+/.test(trimmed)) {
+            ensureSpace(14);
+            doc.setFont('helvetica', 'bold');
+            doc.setFontSize(11.5);
+            doc.setTextColor(accent[0], accent[1], accent[2]);
+            doc.text(trimmed.replace(/^###\s+/, '').replace(/\*\*/g, ''), marginLeft, y);
+            y += 7;
+          } else if (/^##\s+/.test(trimmed)) {
+            ensureSpace(16);
+            doc.setFont('helvetica', 'bold');
+            doc.setFontSize(13.5);
+            doc.setTextColor(navy[0], navy[1], navy[2]);
+            doc.text(trimmed.replace(/^##\s+/, '').replace(/\*\*/g, ''), marginLeft, y);
+            y += 5.5;
+            doc.setDrawColor(220, 226, 233);
+            doc.setLineWidth(0.3);
+            doc.line(marginLeft, y, pageWidth - marginRight, y);
+            y += 6.5;
+          } else if (/^#\s+/.test(trimmed)) {
+            ensureSpace(18);
+            doc.setFont('helvetica', 'bold');
+            doc.setFontSize(16);
+            doc.setTextColor(navy[0], navy[1], navy[2]);
+            doc.text(trimmed.replace(/^#\s+/, '').replace(/\*\*/g, ''), marginLeft, y);
+            y += 9;
+          } else {
+            const lines = trimmed.split('\n');
+            const isList = lines.length && lines.every(l => /^[\-\*]\s+/.test(l.trim()));
+            const isNumbered = lines.length && lines.every(l => /^\d+[\.\)]\s+/.test(l.trim()));
+
+            if (isList || isNumbered) {
+              lines.forEach((l, idx) => {
+                ensureSpace(6);
+                const marker = isNumbered ? (idx + 1) + '.' : '•';
+                doc.setFont('helvetica', 'bold');
+                doc.setFontSize(10);
+                doc.setTextColor(accent[0], accent[1], accent[2]);
+                doc.text(marker, marginLeft + 1, y);
+                const itemText = l.trim().replace(/^[\-\*]\s+/, '').replace(/^\d+[\.\)]\s+/, '');
+                doc.setTextColor(50, 60, 74);
+                const words = tokenizeInline(itemText);
+                drawWrappedRuns(words, marginLeft + 7, y, contentWidth - 7, { fontSize: 10, lineHeight: 5.4, justify: false });
+                y += 2.4;
+              });
+              y += 3;
+            } else {
+              const flat = trimmed.replace(/\n/g, ' ');
+              doc.setTextColor(60, 72, 88);
+              const words = tokenizeInline(flat);
+              ensureSpace(6);
+              drawWrappedRuns(words, marginLeft, y, contentWidth, { fontSize: 10, lineHeight: 5.7, justify: true });
+              y += 4.5;
+            }
+          }
+
+          if (i % 3 === 0) {
+            setProgress(15 + (i / total) * 70, 'Construyendo secciones...');
+            await sleep0();
+          }
+        }
+
+        setProgress(90, 'Añadiendo numeración de páginas...');
+        await sleep0();
+
+        /* ---- Footer on every page ---- */
+        const totalPages = doc.internal.getNumberOfPages();
+        for (let p = 1; p <= totalPages; p++) {
+          doc.setPage(p);
+          doc.setDrawColor(225, 230, 238);
+          doc.setLineWidth(0.3);
+          doc.line(marginLeft, pageHeight - 14, pageWidth - marginRight, pageHeight - 14);
+          doc.setFont('helvetica', 'normal');
+          doc.setFontSize(8);
+          doc.setTextColor(140, 150, 165);
+          doc.text('ClassInsight', marginLeft, pageHeight - 9);
+          doc.text('Generado el ' + dateStr, pageWidth / 2, pageHeight - 9, { align: 'center' });
+          doc.text('Página ' + p + ' de ' + totalPages, pageWidth - marginRight, pageHeight - 9, { align: 'right' });
+        }
+
+        setProgress(100, 'Descargando...');
+        await sleep0();
+        doc.save(pdfFileName(now));
+        toast('PDF generado correctamente', 'success');
+      } catch (err) {
+        toast('No se pudo generar el PDF: ' + err.message, 'error');
+      } finally {
+        setTimeout(() => {
+          progress.classList.remove('show');
+          fill.style.width = '0%';
+          pct.textContent = '0%';
+          btn.disabled = false;
+        }, 500);
+      }
     }
   </script>
 </body>
