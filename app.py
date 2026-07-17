@@ -17,6 +17,7 @@ from fastapi.responses import HTMLResponse, FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
+from pytubefix import YouTube
 
 from backend.core.pipeline import (
     get_aws_clients,
@@ -132,52 +133,19 @@ async def analyze_file(
 async def analyze_youtube(req: YouTubeRequest):
     """Descarga audio de YouTube y lo procesa."""
     job_id = str(uuid.uuid4())[:8]
-    output_path = str(UPLOAD_DIR / f"{job_id}_yt.wav")
+    output_path = UPLOAD_DIR / f"{job_id}_yt.mp4"
 
     try:
-        cmd = [
-            "yt-dlp",
-            "--cookies", "/app/cookies.txt",
-            "--js-runtime", "node",
-            "--extractor-args", "youtube:player_client=web",
-            "--extract-audio",
-            "--audio-format", "wav",
-            "--audio-quality", "0",
-            "--no-playlist",
-            "-o", output_path,
-            req.url,
-        ]
-        proc = await asyncio.create_subprocess_exec(
-            *cmd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE
-        )
-        stdout, stderr = await proc.communicate()
-
-        if proc.returncode != 0:
-            error_msg = stderr.decode("utf-8", errors="replace")
-            logger.error("yt-dlp falló: %s", error_msg)
-            raise HTTPException(400, f"No se pudo descargar el video: {error_msg[:200]}")
-
-        wav_path = Path(output_path)
-        if not wav_path.exists():
-            yt_dlp_output = stdout.decode("utf-8", errors="replace")
-            actual_ext = Path(yt_dlp_output.strip().split("\n")[-1]).suffix if yt_dlp_output.strip() else ""
-            candidates = list(UPLOAD_DIR.glob(f"{job_id}_yt.*"))
-            if candidates:
-                wav_path = candidates[0]
-            else:
-                raise HTTPException(500, "No se encontró el archivo descargado de YouTube")
-
-        result = await run_pipeline(str(wav_path), job_id)
+        yt = YouTube(req.url)
+        stream = yt.streams.filter(only_audio=True).first()
+        stream.download(output_path=str(UPLOAD_DIR), filename=f"{job_id}_yt.mp4")
+        result = await run_pipeline(str(output_path), job_id)
         return {"status": "completed", "result": result, "job_id": job_id}
-
-    except HTTPException:
-        raise
     except Exception as e:
         logger.error("Error con YouTube: %s", e)
         raise HTTPException(500, f"Error al procesar video de YouTube: {str(e)}")
     finally:
-        for f in UPLOAD_DIR.glob(f"{job_id}_yt.*"):
-            f.unlink(missing_ok=True)
+        output_path.unlink(missing_ok=True)
 
 
 # ──────────────────────────────────────────────
