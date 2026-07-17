@@ -208,8 +208,12 @@ async def progress_stream(job_id: str):
 
 async def extract_audio(video_path: str, output_path: str) -> None:
     """Extrae audio de un video usando ffmpeg."""
+    import shutil
+    ffmpeg_path = shutil.which("ffmpeg")
+    logger.info("ffmpeg encontrado en: %s", ffmpeg_path)
+    
     cmd = [
-        "ffmpeg", "-i", video_path,
+        ffmpeg_path or "ffmpeg", "-i", video_path,
         "-vn", "-acodec", "pcm_s16le",
         "-ar", "16000", "-ac", "1",
         "-y", output_path,
