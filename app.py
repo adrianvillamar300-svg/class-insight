@@ -138,6 +138,7 @@ async def analyze_youtube(req: YouTubeRequest):
         cmd = [
             "yt-dlp",
             "--cookies", "/app/cookies.txt",
+            "--js-runtime", "nodejs",
             "--extract-audio",
             "--audio-format", "wav",
             "--audio-quality", "0",
