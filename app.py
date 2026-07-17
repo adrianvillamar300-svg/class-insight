@@ -18,7 +18,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
-from core.pipeline import (
+from backend.core.pipeline import (
     get_aws_clients,
     upload_to_s3,
     start_transcription,
