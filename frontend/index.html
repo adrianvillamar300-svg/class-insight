@@ -286,7 +286,6 @@
       color: var(--text);
     }
 
-    /* H1 — major title, big and prominent */
     #result-content h1 {
       font-family: 'Space Grotesk', sans-serif;
       font-size: 1.45rem;
@@ -299,10 +298,8 @@
       padding-bottom: 10px;
       border-bottom: 2px solid var(--cyan-dim);
     }
-
     #result-content h1:first-child { margin-top: 0; }
 
-    /* H2 — section header, clearly secondary */
     #result-content h2 {
       font-family: 'Space Grotesk', sans-serif;
       font-size: 1.1rem;
@@ -315,26 +312,20 @@
       padding-bottom: 8px;
       border-bottom: 1px solid var(--border);
     }
-
     #result-content h2:first-child { margin-top: 0; }
 
-    /* H3 — subsection, accent colored */
     #result-content h3 {
       font-family: 'Inter', sans-serif;
-      font-size: 0.9rem;
+      font-size: 0.75rem;
       font-weight: 600;
       color: var(--cyan);
-      letter-spacing: 0.01em;
-      text-transform: uppercase;
-      font-size: 0.75rem;
       letter-spacing: 0.08em;
+      text-transform: uppercase;
       margin-top: 24px;
       margin-bottom: 10px;
     }
-
     #result-content h3:first-child { margin-top: 0; }
 
-    /* Paragraphs — comfortable reading */
     #result-content p {
       font-size: 0.9rem;
       font-weight: 400;
@@ -342,23 +333,19 @@
       line-height: 1.8;
       margin-bottom: 16px;
     }
-
     #result-content p:last-child { margin-bottom: 0; }
 
-    /* Strong — highlight, not header */
     #result-content strong {
       color: var(--text-hi);
       font-weight: 600;
     }
 
-    /* Em — accent colored, italic */
     #result-content em {
       color: var(--cyan);
       font-style: italic;
       font-weight: 400;
     }
 
-    /* Lists — well spaced, readable */
     #result-content ul {
       list-style: none;
       padding: 0;
@@ -378,11 +365,7 @@
       border-radius: 8px;
       transition: background var(--transition);
     }
-
-    #result-content li:hover {
-      background: var(--glass-hi);
-    }
-
+    #result-content li:hover { background: var(--glass-hi); }
     #result-content li::before {
       content: '';
       position: absolute;
@@ -394,10 +377,7 @@
       border-radius: 50%;
       opacity: 0.7;
     }
-
-    #result-content li strong {
-      color: var(--text);
-    }
+    #result-content li strong { color: var(--text); }
 
     /* Reveal + typewriter */
     .reveal-block { opacity: 0; transform: translateY(10px); transition: opacity 0.45s ease, transform 0.45s ease; }
@@ -900,6 +880,17 @@
 
     function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
+    // ── FIX 1: Strip emoji/unicode symbols that jsPDF can't render ──
+    function stripEmoji(s) {
+      return s
+        .replace(/[\u{1F000}-\u{1FFFF}]/gu, '')
+        .replace(/[\u{2600}-\u{27BF}]/gu, '')
+        .replace(/[\uFE00-\uFE0F]/gu, '')
+        .replace(/\u200D/gu, '')
+        .replace(/  +/g, ' ')
+        .trim();
+    }
+
     function inlineMd(text) {
       return text.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>').replace(/\*(.+?)\*/g, '<em>$1</em>');
     }
@@ -917,18 +908,49 @@
       return blocks;
     }
 
+    // ── FIX 2: Detect emoji+bold title pattern and split into heading + body ──
     function blockToRenderable(block) {
       const trimmed = block.trim();
+
+      // Standard markdown headings
       if (/^###\s+/.test(trimmed)) return { type: 'html', html: '<h3>' + inlineMd(trimmed.replace(/^###\s+/, '')) + '</h3>' };
       if (/^##\s+/.test(trimmed))  return { type: 'html', html: '<h2>' + inlineMd(trimmed.replace(/^##\s+/, '')) + '</h2>' };
       if (/^#\s+/.test(trimmed))   return { type: 'html', html: '<h1>' + inlineMd(trimmed.replace(/^#\s+/, '')) + '</h1>' };
+
+      // List blocks
       const lines = trimmed.split('\n');
       if (lines.length && lines.every(l => /^[\-\*]\s+/.test(l.trim()))) {
         const items = lines.map(l => '<li>' + inlineMd(l.trim().replace(/^[\-\*]\s+/, '')) + '</li>').join('');
         return { type: 'html', html: '<ul>' + items + '</ul>' };
       }
+
+      // Multi-line block: first line is a bold title (possibly prefixed with emoji),
+      // rest is body text → render as h3 + paragraph
+      if (lines.length >= 2) {
+        const firstLine = lines[0].trim();
+        // Matches: optional emoji chars, then **Title** or **Title:**
+        if (/^[\s\S]*\*\*[^\n]+\*\*\s*:?\s*$/.test(firstLine)) {
+          const titleClean = stripEmoji(firstLine.replace(/\*\*/g, '').replace(/:?\s*$/, '').trim());
+          const bodyFlat = lines.slice(1).join(' ').trim();
+          return {
+            type: 'html',
+            html: '<h3>' + titleClean + '</h3><p>' + inlineMd(bodyFlat) + '</p>'
+          };
+        }
+      }
+
+      // Single line that is purely a bold title with optional emoji prefix
       const flat = trimmed.replace(/\n/g, ' ');
-      return { type: 'paragraph', plain: flat.replace(/\*\*/g, '').replace(/\*/g, ''), innerHtml: inlineMd(flat) };
+      if (/^[\s\S]*\*\*[^\*]+\*\*\s*:?\s*$/.test(flat.trim())) {
+        const titleClean = stripEmoji(flat.replace(/\*\*/g, '').replace(/:?\s*$/, '').trim());
+        return { type: 'html', html: '<h3>' + titleClean + '</h3>' };
+      }
+
+      return {
+        type: 'paragraph',
+        plain: flat.replace(/\*\*/g, '').replace(/\*/g, ''),
+        innerHtml: inlineMd(flat)
+      };
     }
 
     function typewriterInto(el, plainText, finalInnerHtml) {
@@ -1000,7 +1022,7 @@
     }
 
     /* =========================================================
-       PDF — clean, readable, no info box, proper hierarchy
+       PDF — clean, readable, emoji-safe, proper hierarchy
     ========================================================= */
     function pad2(n) { return String(n).padStart(2, '0'); }
 
@@ -1057,7 +1079,6 @@
         const ML = 22, MR = 22, MT = 28, MB = 24;
         const CW = pageWidth - ML - MR;
 
-        /* colour palette */
         const navy   = [15, 23, 42];
         const accent = [43, 108, 176];
         const body   = [55, 65, 81];
@@ -1073,7 +1094,6 @@
         const now = new Date();
         const dateStr = now.toLocaleString('es-ES', { day: '2-digit', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' });
 
-        /* ── Cover header ── */
         /* Brand bar */
         doc.setFillColor(accent[0], accent[1], accent[2]);
         doc.rect(0, 0, pageWidth, 10, 'F');
@@ -1094,7 +1114,7 @@
         doc.text('Informe de Clase', ML, y);
         y += 8;
 
-        /* Thin accent rule */
+        /* Accent rule */
         doc.setDrawColor(accent[0], accent[1], accent[2]);
         doc.setLineWidth(0.8);
         doc.line(ML, y, ML + 40, y);
@@ -1110,9 +1130,6 @@
         setProgress(10, 'Estructurando contenido...');
         await sleep0();
 
-        /* ── Body ── */
-
-        /* Helpers */
         const setStyle = (bold, italic) => {
           let s = 'normal';
           if (bold && italic) s = 'bolditalic';
@@ -1121,14 +1138,6 @@
           doc.setFont('helvetica', s);
         };
 
-        /* Word-wrap a flat string — returns array of line strings */
-        const wrapText = (text, maxW, fontSize) => {
-          doc.setFontSize(fontSize);
-          setStyle(false, false);
-          return doc.splitTextToSize(text, maxW);
-        };
-
-        /* Render rich inline runs with word-wrap, justified */
         const drawRichBlock = (words, x, maxW, opts = {}) => {
           const fs     = opts.fontSize   || 10;
           const lh     = opts.lineHeight || 5.8;
@@ -1139,7 +1148,6 @@
           setStyle(false, false);
           const spW = doc.getTextWidth(' ');
 
-          /* Build lines */
           const lines = [];
           let cur = [], curW = 0;
 
@@ -1176,6 +1184,18 @@
           setStyle(false, false);
         };
 
+        // ── FIX 3: Helper to render a section label in PDF ──
+        const drawSectionLabel = (text) => {
+          const clean = stripEmoji(text.replace(/\*\*/g, '').replace(/:?\s*$/, '').trim()).toUpperCase();
+          ensureSpace(14);
+          y += 3;
+          doc.setFont('helvetica', 'bold');
+          doc.setFontSize(8.5);
+          doc.setTextColor(accent[0], accent[1], accent[2]);
+          doc.text(clean, ML, y);
+          y += 6;
+        };
+
         const blocks = splitBlocks(md);
         const total = blocks.length || 1;
 
@@ -1185,12 +1205,12 @@
 
           /* Markdown table */
           if (trimmed.split('\n').length >= 2 && trimmed.includes('|')) {
-            const lines = trimmed.split('\n').map(l => l.trim()).filter(Boolean);
-            const isSep = /^\|?\s*:?-{2,}:?\s*(\|\s*:?-{2,}:?\s*)*\|?$/.test(lines[1] || '');
+            const tlines = trimmed.split('\n').map(l => l.trim()).filter(Boolean);
+            const isSep = /^\|?\s*:?-{2,}:?\s*(\|\s*:?-{2,}:?\s*)*\|?$/.test(tlines[1] || '');
             if (isSep) {
               const splitRow = l => l.replace(/^\|/, '').replace(/\|$/, '').split('|').map(c => c.trim());
-              const header = splitRow(lines[0]);
-              const rows = lines.slice(2).map(splitRow);
+              const header = splitRow(tlines[0]);
+              const rows = tlines.slice(2).map(splitRow);
               ensureSpace(18);
               doc.autoTable({ startY: y, head: [header], body: rows, margin: { left: ML, right: MR }, styles: { font: 'helvetica', fontSize: 9, cellPadding: 3, textColor: body, lineColor: [220,226,234], lineWidth: 0.2 }, headStyles: { fillColor: accent, textColor: 255, fontStyle: 'bold' }, alternateRowStyles: { fillColor: [246,248,251] }, theme: 'grid' });
               y = doc.lastAutoTable.finalY + 8;
@@ -1200,7 +1220,7 @@
 
           /* H1 */
           if (/^#\s+/.test(trimmed) && !/^##/.test(trimmed)) {
-            const text = trimmed.replace(/^#\s+/, '').replace(/\*\*/g, '');
+            const text = stripEmoji(trimmed.replace(/^#\s+/, '').replace(/\*\*/g, ''));
             ensureSpace(20);
             y += 4;
             doc.setFont('helvetica', 'bold');
@@ -1218,7 +1238,7 @@
 
           /* H2 */
           if (/^##\s+/.test(trimmed) && !/^###/.test(trimmed)) {
-            const text = trimmed.replace(/^##\s+/, '').replace(/\*\*/g, '');
+            const text = stripEmoji(trimmed.replace(/^##\s+/, '').replace(/\*\*/g, ''));
             ensureSpace(16);
             y += 3;
             doc.setFont('helvetica', 'bold');
@@ -1236,7 +1256,7 @@
 
           /* H3 */
           if (/^###\s+/.test(trimmed)) {
-            const text = trimmed.replace(/^###\s+/, '').replace(/\*\*/g, '').toUpperCase();
+            const text = stripEmoji(trimmed.replace(/^###\s+/, '').replace(/\*\*/g, '')).toUpperCase();
             ensureSpace(12);
             y += 2;
             doc.setFont('helvetica', 'bold');
@@ -1254,7 +1274,7 @@
             listLines.forEach((l, li) => {
               const isNum = /^\d+[\.\)]/.test(l.trim());
               const marker = isNum ? (li + 1) + '.' : '–';
-              const itemText = l.trim().replace(/^[\-\*]\s+/, '').replace(/^\d+[\.\)]\s+/, '');
+              const itemText = stripEmoji(l.trim().replace(/^[\-\*]\s+/, '').replace(/^\d+[\.\)]\s+/, ''));
               ensureSpace(7);
               doc.setFont('helvetica', isNum ? 'bold' : 'normal');
               doc.setFontSize(9.5);
@@ -1268,8 +1288,33 @@
             continue;
           }
 
-          /* Paragraph */
-          const flat = trimmed.replace(/\n/g, ' ');
+          /* ── FIX 3: Paragraph — detect emoji+bold title pattern ── */
+          const paraLines = trimmed.split('\n');
+          // Multi-line: first line is **Title** (possibly emoji-prefixed), rest is body
+          if (paraLines.length >= 2) {
+            const firstLine = paraLines[0].trim();
+            if (/^[\s\S]*\*\*[^\n]+\*\*\s*:?\s*$/.test(firstLine)) {
+              drawSectionLabel(firstLine);
+              const bodyFlat = stripEmoji(paraLines.slice(1).join(' ').trim());
+              if (bodyFlat) {
+                ensureSpace(6);
+                const bwords = tokenizeInline(bodyFlat);
+                drawRichBlock(bwords, ML, CW, { fontSize: 10, lineHeight: 5.8, color: body });
+                y += 4;
+              }
+              continue;
+            }
+          }
+
+          // Single line that is purely a bold title (with optional emoji)
+          const flatP = trimmed.replace(/\n/g, ' ');
+          if (/^[\s\S]*\*\*[^\*]+\*\*\s*:?\s*$/.test(flatP.trim())) {
+            drawSectionLabel(flatP);
+            continue;
+          }
+
+          /* Normal paragraph */
+          const flat = stripEmoji(flatP);
           ensureSpace(6);
           const words = tokenizeInline(flat);
           drawRichBlock(words, ML, CW, { fontSize: 10, lineHeight: 5.8, color: body });
@@ -1279,7 +1324,7 @@
         setProgress(90, 'Añadiendo pie de página...');
         await sleep0();
 
-        /* ── Footer on every page ── */
+        /* Footer on every page */
         const totalPages = doc.internal.getNumberOfPages();
         for (let p = 1; p <= totalPages; p++) {
           doc.setPage(p);
@@ -1290,7 +1335,7 @@
           doc.setFontSize(7.5);
           doc.setTextColor(muted[0], muted[1], muted[2]);
           doc.text('ClassInsight · Amazon Bedrock', ML, pageHeight - 9);
-          doc.text('Página ' + p + ' de ' + totalPages, pageWidth - MR, pageHeight - 9, { align: 'right' });
+          doc.text('Pagina ' + p + ' de ' + totalPages, pageWidth - MR, pageHeight - 9, { align: 'right' });
         }
 
         setProgress(100, 'Descargando...');
