@@ -3,178 +3,939 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>ClassInsight - Análisis Inteligente de Clases</title>
-  <script src="https://cdn.tailwindcss.com"></script>
+  <title>ClassInsight — Análisis Inteligente de Clases</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
   <style>
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
-    body { font-family: 'Inter', sans-serif; }
-    .tab-active { border-color: #6366f1; color: #4f46e5; background: #eef2ff; }
-    .drop-zone.dragover { border-color: #6366f1; background: #eef2ff; }
-    .fade-in { animation: fadeIn 0.3s ease-in; }
-    @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
-    .spinner { border: 3px solid #e5e7eb; border-top-color: #6366f1; border-radius: 50%; width: 28px; height: 28px; animation: spin 0.7s linear infinite; }
-    @keyframes spin { to { transform: rotate(360deg); } }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:        #080b10;
+      --surface:   #0e1117;
+      --glass:     rgba(255,255,255,0.04);
+      --border:    rgba(255,255,255,0.08);
+      --border-hi: rgba(99,179,237,0.35);
+      --cyan:      #63b3ed;
+      --cyan-dim:  #2b6cb0;
+      --cyan-glow: rgba(99,179,237,0.15);
+      --text:      #e2e8f0;
+      --muted:     #718096;
+      --danger:    #fc8181;
+      --success:   #68d391;
+      --radius:    14px;
+      --transition: 0.22s cubic-bezier(.4,0,.2,1);
+    }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Inter', sans-serif;
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    /* ── Ambient background ── */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background:
+        radial-gradient(ellipse 60% 40% at 20% 10%, rgba(49,130,206,0.08) 0%, transparent 70%),
+        radial-gradient(ellipse 50% 35% at 80% 85%, rgba(99,179,237,0.06) 0%, transparent 70%);
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    /* ── Scrollbar ── */
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-track { background: var(--bg); }
+    ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 99px; }
+
+    /* ── Header ── */
+    header {
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      background: rgba(8,11,16,0.85);
+      border-bottom: 1px solid var(--border);
+      padding: 0 32px;
+      height: 64px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .logo {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      text-decoration: none;
+    }
+
+    .logo-icon {
+      width: 36px;
+      height: 36px;
+      background: linear-gradient(135deg, #2b6cb0, #63b3ed);
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 0 20px rgba(99,179,237,0.3);
+    }
+
+    .logo-icon svg { width: 18px; height: 18px; color: #fff; }
+
+    .logo-text {
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: 1.1rem;
+      font-weight: 600;
+      color: var(--text);
+      letter-spacing: -0.01em;
+    }
+
+    .logo-badge {
+      font-size: 0.65rem;
+      font-weight: 500;
+      color: var(--cyan);
+      background: var(--cyan-glow);
+      border: 1px solid var(--border-hi);
+      padding: 2px 8px;
+      border-radius: 99px;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+    }
+
+    /* ── Main layout ── */
+    main {
+      position: relative;
+      z-index: 1;
+      max-width: 720px;
+      margin: 0 auto;
+      padding: 60px 24px 120px;
+    }
+
+    /* ── Hero ── */
+    .hero {
+      text-align: center;
+      margin-bottom: 48px;
+      animation: fadeUp 0.5s ease both;
+    }
+
+    .hero-eyebrow {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 0.72rem;
+      font-weight: 500;
+      color: var(--cyan);
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      margin-bottom: 20px;
+      padding: 5px 14px;
+      background: var(--cyan-glow);
+      border: 1px solid var(--border-hi);
+      border-radius: 99px;
+    }
+
+    .hero-eyebrow::before {
+      content: '';
+      width: 6px; height: 6px;
+      background: var(--cyan);
+      border-radius: 50%;
+      box-shadow: 0 0 8px var(--cyan);
+      animation: pulse 2s ease infinite;
+    }
+
+    .hero h1 {
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: clamp(1.8rem, 4vw, 2.6rem);
+      font-weight: 700;
+      line-height: 1.15;
+      letter-spacing: -0.03em;
+      color: #fff;
+      margin-bottom: 16px;
+    }
+
+    .hero h1 span {
+      background: linear-gradient(120deg, #63b3ed, #90cdf4);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .hero p {
+      font-size: 1rem;
+      color: var(--muted);
+      line-height: 1.7;
+      max-width: 480px;
+      margin: 0 auto;
+    }
+
+    /* ── Card ── */
+    .card {
+      background: var(--glass);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      overflow: hidden;
+      backdrop-filter: blur(12px);
+      animation: fadeUp 0.5s 0.1s ease both;
+      transition: border-color var(--transition);
+    }
+
+    .card:hover { border-color: rgba(99,179,237,0.15); }
+
+    /* ── Tabs ── */
+    .tabs {
+      display: flex;
+      border-bottom: 1px solid var(--border);
+      padding: 6px 6px 0;
+      gap: 2px;
+    }
+
+    .tab-btn {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 7px;
+      padding: 10px 12px;
+      font-size: 0.82rem;
+      font-weight: 500;
+      color: var(--muted);
+      background: transparent;
+      border: none;
+      border-radius: 10px 10px 0 0;
+      cursor: pointer;
+      transition: color var(--transition), background var(--transition);
+      position: relative;
+    }
+
+    .tab-btn svg { width: 15px; height: 15px; flex-shrink: 0; }
+
+    .tab-btn:hover { color: var(--text); background: rgba(255,255,255,0.03); }
+
+    .tab-btn.active {
+      color: var(--cyan);
+      background: rgba(99,179,237,0.07);
+    }
+
+    .tab-btn.active::after {
+      content: '';
+      position: absolute;
+      bottom: 0; left: 12px; right: 12px;
+      height: 2px;
+      background: var(--cyan);
+      border-radius: 2px 2px 0 0;
+      box-shadow: 0 0 10px var(--cyan);
+    }
+
+    /* ── Panels ── */
+    .panel { display: none; padding: 28px; }
+    .panel.active { display: block; animation: fadeIn 0.2s ease; }
+
+    /* ── Drop zone ── */
+    .drop-zone {
+      border: 1.5px dashed var(--border);
+      border-radius: var(--radius);
+      padding: 44px 24px;
+      text-align: center;
+      cursor: pointer;
+      transition: border-color var(--transition), background var(--transition);
+      position: relative;
+    }
+
+    .drop-zone:hover, .drop-zone.dragover {
+      border-color: var(--cyan-dim);
+      background: var(--cyan-glow);
+    }
+
+    .drop-zone input[type=file] {
+      position: absolute;
+      inset: 0;
+      opacity: 0;
+      cursor: pointer;
+    }
+
+    .drop-icon {
+      width: 52px; height: 52px;
+      background: rgba(99,179,237,0.1);
+      border: 1px solid var(--border-hi);
+      border-radius: 14px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 0 auto 16px;
+    }
+
+    .drop-icon svg { width: 24px; height: 24px; color: var(--cyan); }
+
+    .drop-zone h3 { font-size: 0.95rem; font-weight: 600; color: var(--text); margin-bottom: 6px; }
+    .drop-zone p  { font-size: 0.8rem; color: var(--muted); line-height: 1.6; }
+
+    .drop-formats {
+      display: flex;
+      gap: 6px;
+      justify-content: center;
+      flex-wrap: wrap;
+      margin-top: 14px;
+    }
+
+    .format-badge {
+      font-size: 0.68rem;
+      font-weight: 600;
+      letter-spacing: 0.05em;
+      color: var(--muted);
+      background: rgba(255,255,255,0.04);
+      border: 1px solid var(--border);
+      padding: 3px 8px;
+      border-radius: 6px;
+      text-transform: uppercase;
+    }
+
+    /* ── File selected state ── */
+    .file-selected {
+      display: none;
+      align-items: center;
+      gap: 12px;
+      background: rgba(99,179,237,0.06);
+      border: 1px solid var(--border-hi);
+      border-radius: var(--radius);
+      padding: 14px 16px;
+      margin-top: 12px;
+    }
+
+    .file-selected.show { display: flex; animation: fadeIn 0.2s ease; }
+
+    .file-selected-icon {
+      width: 36px; height: 36px;
+      background: var(--cyan-glow);
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+
+    .file-selected-icon svg { width: 16px; height: 16px; color: var(--cyan); }
+
+    .file-selected-info { flex: 1; min-width: 0; }
+    .file-selected-name { font-size: 0.85rem; font-weight: 500; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .file-selected-size { font-size: 0.72rem; color: var(--muted); margin-top: 2px; }
+
+    .btn-clear {
+      background: none;
+      border: none;
+      color: var(--muted);
+      cursor: pointer;
+      padding: 4px;
+      border-radius: 6px;
+      transition: color var(--transition), background var(--transition);
+      display: flex;
+    }
+
+    .btn-clear:hover { color: var(--danger); background: rgba(252,129,129,0.1); }
+    .btn-clear svg { width: 16px; height: 16px; }
+
+    /* ── YouTube input ── */
+    .yt-label { font-size: 0.8rem; font-weight: 500; color: var(--muted); margin-bottom: 10px; letter-spacing: 0.02em; }
+
+    .yt-input-row { display: flex; gap: 8px; }
+
+    .yt-input-wrap {
+      flex: 1;
+      position: relative;
+    }
+
+    .yt-input-wrap svg {
+      position: absolute;
+      left: 14px;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 16px; height: 16px;
+      color: var(--muted);
+      pointer-events: none;
+    }
+
+    .yt-input {
+      width: 100%;
+      background: rgba(255,255,255,0.04);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 12px 14px 12px 40px;
+      font-size: 0.85rem;
+      color: var(--text);
+      font-family: 'Inter', sans-serif;
+      outline: none;
+      transition: border-color var(--transition), background var(--transition);
+    }
+
+    .yt-input::placeholder { color: var(--muted); }
+    .yt-input:focus { border-color: var(--cyan-dim); background: rgba(99,179,237,0.04); }
+
+    .btn-validate {
+      background: rgba(255,255,255,0.05);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 12px 18px;
+      font-size: 0.82rem;
+      font-weight: 500;
+      color: var(--text);
+      cursor: pointer;
+      white-space: nowrap;
+      transition: background var(--transition), border-color var(--transition);
+    }
+
+    .btn-validate:hover { background: rgba(255,255,255,0.08); border-color: var(--border-hi); }
+
+    .yt-valid {
+      display: none;
+      align-items: center;
+      gap: 10px;
+      margin-top: 12px;
+      padding: 12px 16px;
+      background: rgba(104,211,145,0.06);
+      border: 1px solid rgba(104,211,145,0.2);
+      border-radius: var(--radius);
+      font-size: 0.82rem;
+      color: var(--success);
+      animation: fadeIn 0.2s ease;
+    }
+
+    .yt-valid.show { display: flex; }
+    .yt-valid svg { width: 16px; height: 16px; flex-shrink: 0; }
+
+    .yt-hint { font-size: 0.75rem; color: var(--muted); margin-top: 12px; line-height: 1.5; }
+
+    /* ── Analyze button ── */
+    .btn-analyze {
+      width: 100%;
+      margin-top: 20px;
+      padding: 15px;
+      background: linear-gradient(135deg, #2b6cb0, #2c5282);
+      border: 1px solid rgba(99,179,237,0.3);
+      border-radius: var(--radius);
+      font-family: 'Inter', sans-serif;
+      font-size: 0.9rem;
+      font-weight: 600;
+      color: #fff;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      transition: all var(--transition);
+      box-shadow: 0 4px 24px rgba(43,108,176,0.3);
+      letter-spacing: 0.01em;
+    }
+
+    .btn-analyze svg { width: 17px; height: 17px; }
+
+    .btn-analyze:hover:not(:disabled) {
+      background: linear-gradient(135deg, #3182ce, #2b6cb0);
+      box-shadow: 0 4px 32px rgba(99,179,237,0.35);
+      transform: translateY(-1px);
+    }
+
+    .btn-analyze:active:not(:disabled) { transform: translateY(0); }
+
+    .btn-analyze:disabled {
+      background: rgba(255,255,255,0.05);
+      border-color: var(--border);
+      color: var(--muted);
+      cursor: not-allowed;
+      box-shadow: none;
+    }
+
+    /* ── Processing ── */
+    .processing {
+      display: none;
+      margin-top: 16px;
+      background: var(--glass);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 40px 32px;
+      text-align: center;
+      animation: fadeUp 0.3s ease;
+    }
+
+    .processing.show { display: block; }
+
+    /* Orbital spinner */
+    .spinner-wrap {
+      width: 72px; height: 72px;
+      margin: 0 auto 28px;
+      position: relative;
+    }
+
+    .spinner-ring {
+      position: absolute;
+      inset: 0;
+      border-radius: 50%;
+      border: 2px solid transparent;
+    }
+
+    .spinner-ring-1 {
+      border-top-color: var(--cyan);
+      animation: spin 1.2s linear infinite;
+      box-shadow: 0 0 16px rgba(99,179,237,0.4);
+    }
+
+    .spinner-ring-2 {
+      inset: 10px;
+      border-right-color: rgba(99,179,237,0.4);
+      animation: spin 1.8s linear infinite reverse;
+    }
+
+    .spinner-ring-3 {
+      inset: 20px;
+      border-bottom-color: rgba(99,179,237,0.2);
+      animation: spin 2.4s linear infinite;
+    }
+
+    .spinner-dot {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .spinner-dot::after {
+      content: '';
+      width: 8px; height: 8px;
+      background: var(--cyan);
+      border-radius: 50%;
+      box-shadow: 0 0 12px var(--cyan);
+      animation: pulse 1.5s ease infinite;
+    }
+
+    .processing-title {
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: 1.1rem;
+      font-weight: 600;
+      color: var(--text);
+      margin-bottom: 8px;
+    }
+
+    .processing-msg {
+      font-size: 0.85rem;
+      color: var(--muted);
+      margin-bottom: 28px;
+      min-height: 1.4em;
+      transition: opacity 0.3s ease;
+    }
+
+    /* Progress bar */
+    .progress-track {
+      background: rgba(255,255,255,0.05);
+      border-radius: 99px;
+      height: 4px;
+      overflow: hidden;
+      margin-bottom: 16px;
+    }
+
+    .progress-fill {
+      height: 100%;
+      background: linear-gradient(90deg, #2b6cb0, #63b3ed);
+      border-radius: 99px;
+      width: 0%;
+      transition: width 0.6s ease;
+      box-shadow: 0 0 10px rgba(99,179,237,0.5);
+    }
+
+    .processing-steps {
+      display: flex;
+      justify-content: center;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+
+    .step-chip {
+      font-size: 0.7rem;
+      font-weight: 500;
+      padding: 4px 10px;
+      border-radius: 99px;
+      border: 1px solid var(--border);
+      color: var(--muted);
+      transition: all 0.3s ease;
+    }
+
+    .step-chip.active {
+      color: var(--cyan);
+      border-color: var(--border-hi);
+      background: var(--cyan-glow);
+    }
+
+    .step-chip.done {
+      color: var(--success);
+      border-color: rgba(104,211,145,0.25);
+      background: rgba(104,211,145,0.06);
+    }
+
+    /* ── Results ── */
+    .results {
+      display: none;
+      margin-top: 16px;
+      animation: fadeUp 0.4s ease;
+    }
+
+    .results.show { display: block; }
+
+    .results-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 18px 24px;
+      background: var(--glass);
+      border: 1px solid var(--border);
+      border-bottom: none;
+      border-radius: 20px 20px 0 0;
+    }
+
+    .results-title {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: 0.95rem;
+      font-weight: 600;
+      color: var(--text);
+    }
+
+    .results-title-dot {
+      width: 8px; height: 8px;
+      background: var(--success);
+      border-radius: 50%;
+      box-shadow: 0 0 8px var(--success);
+    }
+
+    .btn-copy {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 0.78rem;
+      font-weight: 500;
+      color: var(--muted);
+      background: rgba(255,255,255,0.04);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 6px 12px;
+      cursor: pointer;
+      transition: all var(--transition);
+    }
+
+    .btn-copy svg { width: 13px; height: 13px; }
+    .btn-copy:hover { color: var(--cyan); border-color: var(--border-hi); background: var(--cyan-glow); }
+
+    .results-body {
+      background: var(--glass);
+      border: 1px solid var(--border);
+      border-top: none;
+      border-radius: 0 0 20px 20px;
+      padding: 28px 28px 32px;
+    }
+
+    /* Markdown styles */
+    #result-content h1, #result-content h2, #result-content h3 {
+      font-family: 'Space Grotesk', sans-serif;
+      color: var(--text);
+      margin: 24px 0 12px;
+      line-height: 1.3;
+    }
+
+    #result-content h1 { font-size: 1.3rem; }
+    #result-content h2 { font-size: 1.1rem; border-bottom: 1px solid var(--border); padding-bottom: 8px; }
+    #result-content h3 { font-size: 0.95rem; color: var(--cyan); }
+
+    #result-content p { font-size: 0.88rem; color: var(--muted); line-height: 1.8; margin-bottom: 12px; }
+
+    #result-content ul { list-style: none; padding: 0; margin-bottom: 16px; }
+
+    #result-content li {
+      font-size: 0.88rem;
+      color: var(--muted);
+      line-height: 1.7;
+      padding: 6px 0 6px 20px;
+      position: relative;
+      border-bottom: 1px solid rgba(255,255,255,0.03);
+    }
+
+    #result-content li::before {
+      content: '›';
+      position: absolute;
+      left: 4px;
+      color: var(--cyan);
+      font-weight: 700;
+    }
+
+    #result-content strong { color: var(--text); font-weight: 600; }
+    #result-content em { color: var(--cyan); font-style: normal; font-weight: 500; }
+
+    /* ── Footer ── */
+    footer {
+      position: relative;
+      z-index: 1;
+      text-align: center;
+      padding: 32px 24px;
+      border-top: 1px solid var(--border);
+      font-size: 0.75rem;
+      color: var(--muted);
+    }
+
+    footer span { color: var(--cyan); }
+
+    /* ── Animations ── */
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(16px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; }
+      to   { opacity: 1; }
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50%       { opacity: 0.5; transform: scale(0.85); }
+    }
+
+    /* ── Responsive ── */
+    @media (max-width: 600px) {
+      main { padding: 40px 16px 80px; }
+      header { padding: 0 16px; }
+      .hero h1 { font-size: 1.6rem; }
+      .panel { padding: 20px; }
+      .yt-input-row { flex-direction: column; }
+      .btn-validate { width: 100%; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+    }
   </style>
 </head>
-<body class="bg-gray-50 min-h-screen">
+<body>
 
   <!-- Header -->
-  <header class="bg-white border-b border-gray-200 px-6 py-4">
-    <div class="max-w-4xl mx-auto flex items-center gap-3">
-      <div class="w-9 h-9 bg-indigo-600 rounded-lg flex items-center justify-center">
-        <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/>
+  <header>
+    <a class="logo" href="#">
+      <div class="logo-icon">
+        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+            d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/>
         </svg>
       </div>
-      <div>
-        <h1 class="text-lg font-semibold text-gray-900">ClassInsight</h1>
-        <p class="text-xs text-gray-500">Análisis inteligente de clases universitarias</p>
-      </div>
-    </div>
+      <span class="logo-text">ClassInsight</span>
+    </a>
+    <span class="logo-badge">Beta</span>
   </header>
 
   <!-- Main -->
-  <main class="max-w-4xl mx-auto px-6 py-10">
+  <main>
 
-    <!-- Intro -->
-    <div class="text-center mb-10">
-      <h2 class="text-2xl font-bold text-gray-900 mb-2">Sube tu clase para analizarla</h2>
-      <p class="text-gray-500 max-w-lg mx-auto">
-        Obtén un resumen inteligente, detecta fechas de exámenes y puntos clave automáticamente.
-      </p>
+    <!-- Hero -->
+    <div class="hero">
+      <div class="hero-eyebrow">Powered by Amazon Bedrock</div>
+      <h1>Analiza tu clase<br>con <span>inteligencia artificial</span></h1>
+      <p>Transcripción automática, resumen inteligente y detección de fechas clave. Solo sube el archivo y ClassInsight hace el resto.</p>
     </div>
 
-    <!-- Card principal -->
-    <div class="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
-
-      <!-- Tabs de input -->
-      <div class="flex border-b border-gray-200">
-        <button id="tab-audio" onclick="switchTab('audio')" class="tab-btn tab-active flex-1 px-4 py-3.5 text-sm font-medium text-gray-500 border-b-2 transition-all flex items-center justify-center gap-2">
-          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3"/></svg>
+    <!-- Upload Card -->
+    <div class="card">
+      <div class="tabs">
+        <button class="tab-btn active" id="tab-audio" onclick="switchTab('audio')">
+          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+              d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3"/>
+          </svg>
           Audio
         </button>
-        <button id="tab-video" onclick="switchTab('video')" class="tab-btn flex-1 px-4 py-3.5 text-sm font-medium text-gray-500 border-b-2 border-transparent transition-all flex items-center justify-center gap-2 hover:text-gray-700">
-          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
+        <button class="tab-btn" id="tab-video" onclick="switchTab('video')">
+          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+              d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"/>
+          </svg>
           Video
         </button>
-        <button id="tab-youtube" onclick="switchTab('youtube')" class="tab-btn flex-1 px-4 py-3.5 text-sm font-medium text-gray-500 border-b-2 border-transparent transition-all flex items-center justify-center gap-2 hover:text-gray-700">
-          <svg class="w-4 h-4" viewBox="0 0 24 24" fill="currentColor"><path d="M23.498 6.186a3.016 3.016 0 00-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 00.502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 002.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 002.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/></svg>
+        <button class="tab-btn" id="tab-youtube" onclick="switchTab('youtube')">
+          <svg viewBox="0 0 24 24" fill="currentColor">
+            <path d="M23.498 6.186a3.016 3.016 0 00-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 00.502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 002.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 002.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/>
+          </svg>
           YouTube
         </button>
       </div>
 
-      <!-- Contenido de tabs -->
-      <div class="p-6">
-
-        <!-- Audio -->
-        <div id="panel-audio" class="input-panel fade-in">
-          <div id="drop-audio" class="drop-zone border-2 border-dashed border-gray-300 rounded-xl p-10 text-center cursor-pointer hover:border-indigo-400 transition-colors">
-            <svg class="w-12 h-12 mx-auto text-gray-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2z"/></svg>
-            <p class="text-gray-600 font-medium mb-1">Arrastra tu archivo de audio aquí</p>
-            <p class="text-sm text-gray-400">o haz clic para seleccionar</p>
-            <p class="text-xs text-gray-400 mt-3">MP3, WAV, M4A &middot; Máx. 500 MB</p>
-            <input type="file" id="file-audio" accept=".mp3,.wav,.m4a,audio/*" class="hidden" />
+      <!-- Audio panel -->
+      <div class="panel active" id="panel-audio">
+        <div class="drop-zone" id="drop-audio">
+          <input type="file" id="file-audio" accept=".mp3,.wav,.m4a,.ogg,.flac,audio/*">
+          <div class="drop-icon">
+            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+                d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2z"/>
+            </svg>
           </div>
-          <div id="file-info-audio" class="hidden mt-4 flex items-center gap-3 bg-gray-50 rounded-lg px-4 py-3">
-            <svg class="w-5 h-5 text-indigo-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2z"/></svg>
-            <span id="file-name-audio" class="text-sm text-gray-700 truncate flex-1"></span>
-            <button onclick="clearFile('audio')" class="text-gray-400 hover:text-red-500 transition-colors">
-              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
-            </button>
-          </div>
-        </div>
-
-        <!-- Video -->
-        <div id="panel-video" class="input-panel hidden">
-          <div id="drop-video" class="drop-zone border-2 border-dashed border-gray-300 rounded-xl p-10 text-center cursor-pointer hover:border-indigo-400 transition-colors">
-            <svg class="w-12 h-12 mx-auto text-gray-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
-            <p class="text-gray-600 font-medium mb-1">Arrastra tu archivo de video aquí</p>
-            <p class="text-sm text-gray-400">o haz clic para seleccionar</p>
-            <p class="text-xs text-gray-400 mt-3">MP4, MOV, AVI &middot; Máx. 2 GB</p>
-            <input type="file" id="file-video" accept=".mp4,.mov,.avi,video/*" class="hidden" />
-          </div>
-          <div id="file-info-video" class="hidden mt-4 flex items-center gap-3 bg-gray-50 rounded-lg px-4 py-3">
-            <svg class="w-5 h-5 text-indigo-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
-            <span id="file-name-video" class="text-sm text-gray-700 truncate flex-1"></span>
-            <button onclick="clearFile('video')" class="text-gray-400 hover:text-red-500 transition-colors">
-              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
-            </button>
+          <h3>Arrastra tu archivo de audio aquí</h3>
+          <p>o haz clic para seleccionar desde tu dispositivo</p>
+          <div class="drop-formats">
+            <span class="format-badge">MP3</span>
+            <span class="format-badge">WAV</span>
+            <span class="format-badge">M4A</span>
+            <span class="format-badge">OGG</span>
+            <span class="format-badge">FLAC</span>
           </div>
         </div>
-
-        <!-- YouTube -->
-        <div id="panel-youtube" class="input-panel hidden">
-          <label for="yt-url" class="block text-sm font-medium text-gray-700 mb-2">Pega el enlace del video</label>
-          <div class="flex gap-3">
-            <div class="flex-1 relative">
-              <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                <svg class="w-5 h-5 text-gray-400" viewBox="0 0 24 24" fill="currentColor"><path d="M23.498 6.186a3.016 3.016 0 00-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 00.502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 002.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 002.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/></svg>
-              </div>
-              <input
-                type="url"
-                id="yt-url"
-                placeholder="https://www.youtube.com/watch?v=..."
-                class="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all"
-              />
-            </div>
-            <button onclick="validateYouTube()" class="px-4 py-3 bg-gray-100 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-200 transition-colors flex-shrink-0">
-              Validar
-            </button>
+        <div class="file-selected" id="file-info-audio">
+          <div class="file-selected-icon">
+            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2z"/>
+            </svg>
           </div>
-          <div id="yt-preview" class="hidden mt-4">
-            <div class="flex items-center gap-3 bg-gray-50 rounded-lg px-4 py-3">
-              <svg class="w-5 h-5 text-red-500 flex-shrink-0" viewBox="0 0 24 24" fill="currentColor"><path d="M23.498 6.186a3.016 3.016 0 00-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 00.502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 002.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 002.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/></svg>
-              <span id="yt-title" class="text-sm text-gray-700 truncate flex-1">Video de YouTube detectado</span>
-              <svg class="w-5 h-5 text-green-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
-            </div>
+          <div class="file-selected-info">
+            <div class="file-selected-name" id="file-name-audio"></div>
+            <div class="file-selected-size" id="file-size-audio"></div>
           </div>
-          <p class="text-xs text-gray-400 mt-3">Soporta enlaces públicos de YouTube. Se extraerá el audio para su análisis.</p>
+          <button class="btn-clear" onclick="clearFile('audio')">
+            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+            </svg>
+          </button>
         </div>
+        <button class="btn-analyze" id="btn-analyze-audio" onclick="handleAnalyze()" disabled>
+          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+          </svg>
+          Analizar clase
+        </button>
       </div>
 
-      <!-- Botón de acción -->
-      <div class="px-6 pb-6">
-        <button
-          id="btn-analyze"
-          onclick="handleAnalyze()"
-          disabled
-          class="w-full py-3.5 bg-indigo-600 text-white font-semibold rounded-xl hover:bg-indigo-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-2"
-        >
-          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+      <!-- Video panel -->
+      <div class="panel" id="panel-video">
+        <div class="drop-zone" id="drop-video">
+          <input type="file" id="file-video" accept=".mp4,.mov,.avi,.mkv,.webm,video/*">
+          <div class="drop-icon">
+            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+                d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"/>
+            </svg>
+          </div>
+          <h3>Arrastra tu archivo de video aquí</h3>
+          <p>o haz clic para seleccionar desde tu dispositivo</p>
+          <div class="drop-formats">
+            <span class="format-badge">MP4</span>
+            <span class="format-badge">MOV</span>
+            <span class="format-badge">AVI</span>
+            <span class="format-badge">MKV</span>
+          </div>
+        </div>
+        <div class="file-selected" id="file-info-video">
+          <div class="file-selected-icon">
+            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"/>
+            </svg>
+          </div>
+          <div class="file-selected-info">
+            <div class="file-selected-name" id="file-name-video"></div>
+            <div class="file-selected-size" id="file-size-video"></div>
+          </div>
+          <button class="btn-clear" onclick="clearFile('video')">
+            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+            </svg>
+          </button>
+        </div>
+        <button class="btn-analyze" id="btn-analyze-video" onclick="handleAnalyze()" disabled>
+          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+          </svg>
+          Analizar clase
+        </button>
+      </div>
+
+      <!-- YouTube panel -->
+      <div class="panel" id="panel-youtube">
+        <p class="yt-label">Enlace del video de YouTube</p>
+        <div class="yt-input-row">
+          <div class="yt-input-wrap">
+            <svg viewBox="0 0 24 24" fill="currentColor">
+              <path d="M23.498 6.186a3.016 3.016 0 00-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 00.502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 002.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 002.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/>
+            </svg>
+            <input class="yt-input" type="url" id="yt-url" placeholder="https://www.youtube.com/watch?v=...">
+          </div>
+          <button class="btn-validate" onclick="validateYouTube()">Validar</button>
+        </div>
+        <div class="yt-valid" id="yt-preview">
+          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+          </svg>
+          <span>Enlace de YouTube válido — listo para analizar</span>
+        </div>
+        <p class="yt-hint">Solo videos públicos. El audio se extrae automáticamente para su análisis.</p>
+        <button class="btn-analyze" id="btn-analyze-youtube" onclick="handleAnalyze()" disabled>
+          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+          </svg>
           Analizar clase
         </button>
       </div>
     </div>
 
-    <!-- Estado de procesamiento -->
-    <div id="processing" class="hidden mt-6 bg-white rounded-2xl shadow-sm border border-gray-200 p-8 text-center fade-in">
-      <div class="spinner mx-auto mb-4"></div>
-      <p id="processing-status" class="text-gray-700 font-medium">Procesando tu archivo...</p>
-      <p class="text-sm text-gray-400 mt-1">Esto puede tomar unos minutos. No cierres esta ventana.</p>
-      <div class="mt-4 w-full bg-gray-100 rounded-full h-1.5 overflow-hidden">
-        <div id="progress-bar" class="bg-indigo-500 h-1.5 rounded-full transition-all duration-500" style="width: 0%"></div>
+    <!-- Processing -->
+    <div class="processing" id="processing">
+      <div class="spinner-wrap">
+        <div class="spinner-ring spinner-ring-1"></div>
+        <div class="spinner-ring spinner-ring-2"></div>
+        <div class="spinner-ring spinner-ring-3"></div>
+        <div class="spinner-dot"></div>
+      </div>
+      <div class="processing-title">Procesando tu clase</div>
+      <div class="processing-msg" id="processing-msg">Iniciando análisis...</div>
+      <div class="progress-track">
+        <div class="progress-fill" id="progress-fill"></div>
+      </div>
+      <div class="processing-steps">
+        <span class="step-chip" id="step-upload">Subiendo</span>
+        <span class="step-chip" id="step-transcribe">Transcribiendo</span>
+        <span class="step-chip" id="step-extract">Procesando</span>
+        <span class="step-chip" id="step-analyze">Analizando IA</span>
       </div>
     </div>
 
-    <!-- Resultado -->
-    <div id="results" class="hidden mt-6 fade-in">
-      <div class="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
-        <div class="flex items-center justify-between px-6 py-4 border-b border-gray-100">
-          <h3 class="font-semibold text-gray-900">Resultado del análisis</h3>
-          <button onclick="copyToClipboard()" class="text-sm text-indigo-600 hover:text-indigo-800 font-medium transition-colors flex items-center gap-1.5">
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
-            Copiar
-          </button>
+    <!-- Results -->
+    <div class="results" id="results">
+      <div class="results-header">
+        <div class="results-title">
+          <div class="results-title-dot"></div>
+          Análisis completado
         </div>
-        <div id="result-content" class="p-6 prose prose-sm max-w-none"></div>
+        <button class="btn-copy" onclick="copyToClipboard()">
+          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+              d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/>
+          </svg>
+          Copiar
+        </button>
+      </div>
+      <div class="results-body">
+        <div id="result-content"></div>
       </div>
     </div>
 
   </main>
 
-  <!-- Footer -->
-  <footer class="border-t border-gray-200 mt-16 py-6 text-center text-xs text-gray-400">
-    ClassInsight &copy; 2026 &middot; Análisis inteligente con Amazon Bedrock
+  <footer>
+    ClassInsight &copy; 2026 &middot; Construido con <span>Amazon Bedrock</span> &amp; FastAPI
   </footer>
 
   <script>
@@ -182,204 +943,196 @@
     let selectedFiles = { audio: null, video: null };
     let youtubeValid = false;
 
-    // --- Tab switching ---
+    const steps = ['upload', 'transcribe', 'extract', 'analyze'];
+    const stepMessages = {
+      uploading:    ['Subiendo archivo a S3...', 10, 'upload'],
+      transcribing: ['Transcribiendo el audio con AWS...', 35, 'transcribe'],
+      extracting:   ['Procesando la transcripción...', 65, 'extract'],
+      analyzing:    ['Analizando con inteligencia artificial...', 85, 'analyze'],
+      completed:    ['Análisis completado', 100, null],
+    };
+
+    // ── Tabs ──
     function switchTab(tab) {
       currentTab = tab;
-      document.querySelectorAll('.tab-btn').forEach(btn => {
-        btn.classList.remove('tab-active');
-        btn.classList.add('border-transparent');
-      });
-      document.getElementById(`tab-${tab}`).classList.add('tab-active');
-      document.getElementById(`tab-${tab}`).classList.remove('border-transparent');
-      document.querySelectorAll('.input-panel').forEach(p => p.classList.add('hidden'));
-      document.getElementById(`panel-${tab}`).classList.remove('hidden');
-      updateButton();
+      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+      document.getElementById(`tab-${tab}`).classList.add('active');
+      document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+      document.getElementById(`panel-${tab}`).classList.add('active');
     }
 
-    // --- File handling ---
-    function setupDropZone(type) {
+    // ── Drop zones ──
+    function setupDrop(type) {
       const zone = document.getElementById(`drop-${type}`);
       const input = document.getElementById(`file-${type}`);
 
-      zone.addEventListener('click', () => input.click());
-
-      zone.addEventListener('dragover', e => {
-        e.preventDefault();
-        zone.classList.add('dragover');
-      });
+      zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('dragover'); });
       zone.addEventListener('dragleave', () => zone.classList.remove('dragover'));
       zone.addEventListener('drop', e => {
         e.preventDefault();
         zone.classList.remove('dragover');
-        if (e.dataTransfer.files.length) handleFile(type, e.dataTransfer.files[0]);
+        if (e.dataTransfer.files[0]) handleFile(type, e.dataTransfer.files[0]);
       });
-
-      input.addEventListener('change', () => {
-        if (input.files.length) handleFile(type, input.files[0]);
-      });
+      input.addEventListener('change', () => { if (input.files[0]) handleFile(type, input.files[0]); });
     }
 
     function handleFile(type, file) {
       selectedFiles[type] = file;
-      const ext = type === 'audio' ? 'audio' : 'video';
-      document.getElementById(`file-name-${type}`).textContent = `${file.name} (${(file.size / 1024 / 1024).toFixed(1)} MB)`;
-      document.getElementById(`file-info-${type}`).classList.remove('hidden');
-      document.getElementById(`drop-${type}`).classList.add('hidden');
-      updateButton();
+      const size = file.size < 1024*1024
+        ? `${(file.size/1024).toFixed(0)} KB`
+        : `${(file.size/1024/1024).toFixed(1)} MB`;
+      document.getElementById(`file-name-${type}`).textContent = file.name;
+      document.getElementById(`file-size-${type}`).textContent = size;
+      document.getElementById(`file-info-${type}`).classList.add('show');
+      document.getElementById(`drop-${type}`).style.display = 'none';
+      document.getElementById(`btn-analyze-${type}`).disabled = false;
     }
 
     function clearFile(type) {
       selectedFiles[type] = null;
       document.getElementById(`file-${type}`).value = '';
-      document.getElementById(`file-info-${type}`).classList.add('hidden');
-      document.getElementById(`drop-${type}`).classList.remove('hidden');
-      updateButton();
+      document.getElementById(`file-info-${type}`).classList.remove('show');
+      document.getElementById(`drop-${type}`).style.display = '';
+      document.getElementById(`btn-analyze-${type}`).disabled = true;
     }
 
-    // --- YouTube validation ---
+    // ── YouTube ──
     function validateYouTube() {
       const url = document.getElementById('yt-url').value.trim();
-      const regex = /^(https?:\/\/)?(www\.)?(youtube\.com\/(watch\?v=|embed\/)|youtu\.be\/)([\w-]+)/;
-      if (regex.test(url)) {
-        youtubeValid = true;
-        document.getElementById('yt-preview').classList.remove('hidden');
-        document.getElementById('yt-title').textContent = 'Enlace de YouTube válido';
-        updateButton();
-      } else {
-        youtubeValid = false;
-        document.getElementById('yt-preview').classList.add('hidden');
-        alert('Por favor, ingresa un enlace válido de YouTube.');
-      }
+      const ok = /^(https?:\/\/)?(www\.)?(youtube\.com\/(watch\?v=|embed\/)|youtu\.be\/)([\w-]+)/.test(url);
+      youtubeValid = ok;
+      document.getElementById('yt-preview').classList.toggle('show', ok);
+      document.getElementById('btn-analyze-youtube').disabled = !ok;
+      if (!ok) alert('Por favor ingresa un enlace válido de YouTube.');
     }
 
-    document.getElementById('yt-url').addEventListener('input', () => {
-      youtubeValid = false;
-      document.getElementById('yt-preview').classList.add('hidden');
-      updateButton();
+    document.addEventListener('DOMContentLoaded', () => {
+      document.getElementById('yt-url').addEventListener('input', () => {
+        youtubeValid = false;
+        document.getElementById('yt-preview').classList.remove('show');
+        document.getElementById('btn-analyze-youtube').disabled = true;
+      });
+      setupDrop('audio');
+      setupDrop('video');
     });
 
-    // --- Button state ---
-    function updateButton() {
-      const btn = document.getElementById('btn-analyze');
-      let hasInput = false;
-      if (currentTab === 'audio') hasInput = !!selectedFiles.audio;
-      else if (currentTab === 'video') hasInput = !!selectedFiles.video;
-      else if (currentTab === 'youtube') hasInput = youtubeValid;
-      btn.disabled = !hasInput;
+    // ── Progress ──
+    function setStep(statusKey) {
+      const info = stepMessages[statusKey];
+      if (!info) return;
+      const [msg, pct, activeStep] = info;
+
+      document.getElementById('processing-msg').textContent = msg;
+      document.getElementById('progress-fill').style.width = pct + '%';
+
+      const activeIdx = steps.indexOf(activeStep);
+      steps.forEach((s, i) => {
+        const el = document.getElementById(`step-${s}`);
+        el.classList.remove('active', 'done');
+        if (i < activeIdx) el.classList.add('done');
+        else if (i === activeIdx) el.classList.add('active');
+      });
     }
 
-    // --- Analyze handler (conecta con el backend FastAPI) ---
+    // ── Analyze ──
     async function handleAnalyze() {
-      const processingEl = document.getElementById('processing');
-      const statusEl = document.getElementById('processing-status');
-      const progressEl = document.getElementById('progress-bar');
-
-      processingEl.classList.remove('hidden');
-      document.getElementById('btn-analyze').disabled = true;
+      document.getElementById('processing').classList.add('show');
+      document.getElementById('results').classList.remove('show');
+      document.querySelectorAll('.btn-analyze').forEach(b => b.disabled = true);
+      setStep('uploading');
 
       try {
+        let result;
         if (currentTab === 'youtube') {
-          await processYouTube(statusEl, progressEl);
+          result = await processYouTube();
         } else {
-          await processFile(statusEl, progressEl);
+          result = await processFile();
         }
-
-        statusEl.textContent = 'Análisis completado';
-        progressEl.style.width = '100%';
-        await new Promise(r => setTimeout(r, 600));
-        processingEl.classList.add('hidden');
-
+        setStep('completed');
+        await new Promise(r => setTimeout(r, 500));
+        document.getElementById('processing').classList.remove('show');
+        renderResult(result);
       } catch (err) {
-        processingEl.classList.add('hidden');
-        alert('Error al procesar: ' + err.message);
-        document.getElementById('btn-analyze').disabled = false;
+        document.getElementById('processing').classList.remove('show');
+        alert('Error: ' + err.message);
+        document.querySelectorAll('.btn-analyze').forEach(b => {
+          if (currentTab === 'audio') document.getElementById('btn-analyze-audio').disabled = !selectedFiles.audio;
+          if (currentTab === 'video') document.getElementById('btn-analyze-video').disabled = !selectedFiles.video;
+          if (currentTab === 'youtube') document.getElementById('btn-analyze-youtube').disabled = !youtubeValid;
+        });
       }
     }
 
-    // --- Subir archivo (audio o video) al backend ---
-    async function processFile(statusEl, progressEl) {
+    async function processFile() {
       const file = currentTab === 'audio' ? selectedFiles.audio : selectedFiles.video;
-      if (!file) throw new Error('No se seleccionó ningún archivo');
+      const form = new FormData();
+      form.append('file', file);
+      form.append('input_type', currentTab);
 
-      const formData = new FormData();
-      formData.append('file', file);
-      formData.append('input_type', currentTab);
+      // Simulate step progression while waiting
+      setTimeout(() => setStep('transcribing'), 3000);
+      setTimeout(() => setStep('extracting'), 8000);
+      setTimeout(() => setStep('analyzing'), 14000);
 
-      statusEl.textContent = 'Subiendo archivo...';
-      progressEl.style.width = '10%';
-
-      const response = await fetch('/api/analyze', { method: 'POST', body: formData });
-
-      if (!response.ok) {
-        const err = await response.json().catch(() => ({ detail: 'Error desconocido' }));
+      const res = await fetch('/api/analyze', { method: 'POST', body: form });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ detail: 'Error desconocido' }));
         throw new Error(err.detail || 'Error del servidor');
       }
-
-      const data = await response.json();
-      renderResult(data.result);
+      const data = await res.json();
+      return data.result;
     }
 
-    // --- Enviar URL de YouTube al backend ---
-    async function processYouTube(statusEl, progressEl) {
+    async function processYouTube() {
       const url = document.getElementById('yt-url').value.trim();
+      setTimeout(() => setStep('transcribing'), 5000);
+      setTimeout(() => setStep('extracting'), 12000);
+      setTimeout(() => setStep('analyzing'), 20000);
 
-      statusEl.textContent = 'Descargando audio de YouTube...';
-      progressEl.style.width = '10%';
-
-      const response = await fetch('/api/analyze-youtube', {
+      const res = await fetch('/api/analyze-youtube', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ url }),
       });
-
-      if (!response.ok) {
-        const err = await response.json().catch(() => ({ detail: 'Error desconocido' }));
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ detail: 'Error desconocido' }));
         throw new Error(err.detail || 'Error del servidor');
       }
-
-      const data = await response.json();
-      renderResult(data.result);
+      const data = await res.json();
+      return data.result;
     }
 
-    // --- Renderizar resultado real del backend ---
-    function renderResult(markdownText) {
-      const container = document.getElementById('result-content');
-      container.innerHTML = markdownToHtml(markdownText);
-      document.getElementById('results').classList.remove('hidden');
-      document.getElementById('btn-analyze').disabled = false;
+    // ── Render ──
+    function renderResult(md) {
+      document.getElementById('result-content').innerHTML = mdToHtml(md);
+      document.getElementById('results').classList.add('show');
+      document.getElementById('results').scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
 
-    // --- Convertor básico de Markdown a HTML ---
-    function markdownToHtml(md) {
-      let html = md
-        .replace(/^### (.+)$/gm, '<h3 class="text-base font-bold text-gray-900 mt-4 mb-2">$1</h3>')
-        .replace(/^## (.+)$/gm, '<h2 class="text-lg font-bold text-gray-900 mt-6 mb-3">$1</h2>')
-        .replace(/^# (.+)$/gm, '<h1 class="text-xl font-bold text-gray-900 mt-6 mb-3">$1</h1>')
+    function mdToHtml(md) {
+      return md
+        .replace(/^### (.+)$/gm, '<h3>$1</h3>')
+        .replace(/^## (.+)$/gm, '<h2>$1</h2>')
+        .replace(/^# (.+)$/gm, '<h1>$1</h1>')
         .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
         .replace(/\*(.+?)\*/g, '<em>$1</em>')
-        .replace(/^[\-\*] (.+)$/gm, '<li class="text-gray-600 ml-4">$1</li>')
-        .replace(/(<li[^>]*>.*<\/li>\n?)+/g, (match) => '<ul class="space-y-1 my-2">' + match + '</ul>')
-        .replace(/\n{2,}/g, '</p><p class="text-gray-600 my-2">')
-        .replace(/\n/g, '<br>');
-      return '<p class="text-gray-600 my-2">' + html + '</p>';
+        .replace(/^[\-\*] (.+)$/gm, '<li>$1</li>')
+        .replace(/(<li>.*<\/li>\n?)+/g, m => '<ul>' + m + '</ul>')
+        .replace(/\n{2,}/g, '</p><p>')
+        .replace(/\n/g, '<br>')
+        .replace(/^(?!<[hup])/, '<p>')
+        + '</p>';
     }
 
-    // --- Copy result ---
     function copyToClipboard() {
-      const text = document.getElementById('result-content').innerText;
-      navigator.clipboard.writeText(text).then(() => {
-        const btn = event.target.closest('button');
-        const original = btn.innerHTML;
-        btn.innerHTML = '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg> Copiado';
-        setTimeout(() => { btn.innerHTML = original; }, 2000);
+      navigator.clipboard.writeText(document.getElementById('result-content').innerText).then(() => {
+        const btn = document.querySelector('.btn-copy');
+        btn.innerHTML = `<svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg> Copiado`;
+        setTimeout(() => {
+          btn.innerHTML = `<svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg> Copiar`;
+        }, 2000);
       });
     }
-
-    // --- Init ---
-    setupDropZone('audio');
-    setupDropZone('video');
-    updateButton();
   </script>
-
 </body>
 </html>
