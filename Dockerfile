@@ -7,8 +7,6 @@ RUN apt-get update && apt-get install -y \
     && apt-get install -y nodejs \
     && rm -rf /var/lib/apt/lists/*
 
-RUN npm install -g @yt-dlp/ejs
-
 WORKDIR /app
 
 COPY requirements.txt .
