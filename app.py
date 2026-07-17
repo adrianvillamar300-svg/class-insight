@@ -139,6 +139,7 @@ async def analyze_youtube(req: YouTubeRequest):
             "yt-dlp",
             "--cookies", "/app/cookies.txt",
             "--js-runtime", "node",
+            "--extractor-args", "youtube:player_client=web",
             "--extract-audio",
             "--audio-format", "wav",
             "--audio-quality", "0",
