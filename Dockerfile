@@ -1,17 +1,16 @@
-FROM node:20-slim
+FROM python:3.11-slim
 
 RUN apt-get update && apt-get install -y \
-    python3 \
-    python3-pip \
     ffmpeg \
+    curl \
+    && curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
+    && apt-get install -y nodejs \
     && rm -rf /var/lib/apt/lists/*
-
-RUN pip3 install yt-dlp --break-system-packages
 
 WORKDIR /app
 
 COPY requirements.txt .
-RUN pip3 install -r requirements.txt --break-system-packages
+RUN pip install -r requirements.txt
 
 COPY . .
 
